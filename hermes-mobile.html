@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hermes - 智能体助手</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --bg-glass: rgba(30, 30, 40, 0.75);
+      --bg-glass-light: rgba(50, 50, 65, 0.6);
+      --bg-glass-border: rgba(255, 255, 255, 0.1);
+      --accent: #6e56cf;
+      --accent-glow: rgba(110, 86, 207, 0.4);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.6);
+      --text-muted: rgba(255, 255, 255, 0.35);
+      --user-bubble: linear-gradient(135deg, #6e56cf, #8b5cf6);
+      --ai-bubble: rgba(45, 45, 55, 0.9);
+      --danger: #ef4444;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(145deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    /* Ambient glow */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 30%, rgba(110, 86, 207, 0.15) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+      animation: ambientMove 20s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes ambientMove {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-5%, -5%); }
+    }
+
+    /* Phone Frame */
+    .phone-frame {
+      width: 375px;
+      height: 812px;
+      background: linear-gradient(180deg, #1e1e2e 0%, #151520 100%);
+      border-radius: 50px;
+      padding: 12px;
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.1),
+        0 25px 80px rgba(0, 0, 0, 0.5),
+        0 0 120px rgba(110, 86, 207, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      position: relative;
+      z-index: 1;
+    }
+
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, #12121a 0%, #0a0a0f 100%);
+      border-radius: 40px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Dynamic Island */
+    .dynamic-island {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 34px;
+      background: #000;
+      border-radius: 20px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 12px;
+    }
+
+    .dynamic-island::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      background: radial-gradient(circle, rgba(0,0,0,0.8), #111);
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      height: 54px;
+      padding: 14px 24px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 600;
+      position: relative;
+      z-index: 50;
+    }
+
+    .status-bar-time { font-weight: 600; }
+    .status-icons {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    /* Pages Container */
+    .pages-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .page {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Chat Page */
+    .chat-header {
+      padding: 20px 20px 12px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(18, 18, 26, 0.95) 0%, transparent 100%);
+      position: relative;
+      z-index: 10;
+    }
+
+    .chat-header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .chat-header h1::before {
+      content: '✦';
+      color: var(--accent);
+      font-size: 14px;
+    }
+
+    .chat-header h1::after {
+      content: '✦';
+      color: var(--accent);
+      font-size: 14px;
+    }
+
+    .messages-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+
+    .messages-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .messages-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .messages-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 20px;
+      font-size: 15px;
+      line-height: 1.5;
+      animation: messageIn 0.3s ease;
+      word-wrap: break-word;
+    }
+
+    @keyframes messageIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: var(--user-bubble);
+      color: white;
+      border-bottom-right-radius: 6px;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+
+    .message.ai {
+      align-self: flex-start;
+      background: var(--ai-bubble);
+      color: var(--text-primary);
+      border: 1px solid var(--bg-glass-border);
+      backdrop-filter: blur(10px);
+      border-bottom-left-radius: 6px;
+    }
+
+    .message.ai::before {
+      content: '🤖';
+      display: inline-block;
+      margin-right: 8px;
+      font-size: 14px;
+    }
+
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 8px 0;
+      align-self: flex-start;
+      margin-left: 16px;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      animation: typingBounce 1.4s infinite ease-in-out;
+    }
+
+    .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    .chat-input-area {
+      padding: 12px 16px 36px;
+      background: linear-gradient(0deg, rgba(18, 18, 26, 0.98) 40%, transparent 100%);
+      position: relative;
+    }
+
+    .chat-input-wrapper {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      background: var(--bg-glass);
+      border: 1px solid var(--bg-glass-border);
+      border-radius: 24px;
+      padding: 8px 8px 8px 16px;
+      backdrop-filter: blur(20px);
+    }
+
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 15px;
+      line-height: 1.4;
+      max-height: 100px;
+      resize: none;
+      font-family: inherit;
+    }
+
+    .chat-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .send-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .send-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px var(--accent-glow);
+    }
+
+    .send-btn:active {
+      transform: scale(0.95);
+    }
+
+    .send-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: white;
+    }
+
+    /* Experts Page */
+    .page-header {
+      padding: 60px 20px 16px;
+      background: linear-gradient(180deg, rgba(18, 18, 26, 0.95) 0%, transparent 100%);
+    }
+
+    .page-header h2 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .page-header p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .experts-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px 100px;
+    }
+
+    .expert-card {
+      background: var(--bg-glass);
+      border: 1px solid var(--bg-glass-border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(20px);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .expert-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .expert-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .expert-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .expert-role {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .expert-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    /* Workflow Page */
+    .workflow-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px 100px;
+    }
+
+    .workflow-card {
+      background: var(--bg-glass);
+      border: 1px solid var(--bg-glass-border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(20px);
+    }
+
+    .workflow-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .workflow-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .workflow-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .workflow-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .workflow-steps {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .workflow-step {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .workflow-step::before {
+      content: '→ ';
+      opacity: 0.5;
+    }
+
+    .workflow-card:first-child .workflow-icon {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .workflow-card:last-child .workflow-icon {
+      background: linear-gradient(135deg, #ec4899, #db2777);
+    }
+
+    /* Settings Page */
+    .settings-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px 100px;
+    }
+
+    .settings-section {
+      margin-bottom: 24px;
+    }
+
+    .settings-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 4px;
+      margin-bottom: 8px;
+    }
+
+    .settings-card {
+      background: var(--bg-glass);
+      border: 1px solid var(--bg-glass-border);
+      border-radius: 16px;
+      overflow: hidden;
+      backdrop-filter: blur(20px);
+    }
+
+    .settings-item {
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .settings-item:last-child {
+      border-bottom: none;
+    }
+
+    .settings-item:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .settings-item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .settings-item-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .settings-item-icon.purple { background: rgba(110, 86, 207, 0.3); }
+    .settings-item-icon.blue { background: rgba(59, 130, 246, 0.3); }
+    .settings-item-icon.green { background: rgba(16, 185, 129, 0.3); }
+    .settings-item-icon.orange { background: rgba(245, 158, 11, 0.3); }
+    .settings-item-icon.red { background: rgba(239, 68, 68, 0.3); }
+
+    .settings-item-label {
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+
+    .settings-item-value {
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .settings-item-value::after {
+      content: '›';
+      font-size: 18px;
+      opacity: 0.4;
+    }
+
+    .toggle-switch {
+      width: 51px;
+      height: 31px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .toggle-switch.active {
+      background: var(--accent);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 27px;
+      height: 27px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+
+    .about-card {
+      background: linear-gradient(135deg, rgba(110, 86, 207, 0.2), rgba(139, 92, 246, 0.1));
+      border: 1px solid rgba(110, 86, 207, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .about-logo {
+      font-size: 40px;
+      margin-bottom: 8px;
+    }
+
+    .about-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .about-version {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .about-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
+    /* Bottom Navigation */
+    .bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 84px;
+      background: rgba(18, 18, 26, 0.85);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid var(--bg-glass-border);
+      display: flex;
+      justify-content: space-around;
+      align-items: flex-start;
+      padding-top: 8px;
+      z-index: 100;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 8px 16px;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-item-icon {
+      font-size: 24px;
+      opacity: 0.5;
+      transition: all 0.2s ease;
+    }
+
+    .nav-item-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .nav-item.active .nav-item-icon {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    .nav-item.active .nav-item-label {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .nav-item:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-frame">
+    <div class="phone-screen">
+      <div class="dynamic-island"></div>
+
+      <div class="status-bar">
+        <span class="status-bar-time">9:41</span>
+        <div class="status-icons">
+          <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+            <path d="M1 4.5C1 3.67 1.67 3 2.5 3H3.5C4.33 3 5 3.67 5 4.5V10.5C5 11.33 4.33 12 3.5 12H2.5C1.67 12 1 11.33 1 10.5V4.5Z"/>
+            <path d="M6 3C6 2.17 6.67 1.5 7.5 1.5H8.5C9.33 1.5 10 2.17 10 3V10.5C10 11.33 9.33 12 8.5 12H7.5C6.67 12 6 11.33 6 10.5V3Z"/>
+            <path d="M11 1.5C11 0.67 11.67 0 12.5 0H13.5C14.33 0 15 0.67 15 1.5V10.5C15 11.33 14.33 12 13.5 12H12.5C11.67 12 11 11.33 11 10.5V1.5Z"/>
+          </svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+            <path d="M8 2.5C10.5 2.5 12.7 3.6 14.2 5.3C14.5 5.6 14.5 6.1 14.2 6.4L13 7.5C12.8 7.7 12.5 7.8 12.2 7.8C11.9 7.8 11.6 7.7 11.4 7.5C10.3 6.5 8.7 6 7 6C5.3 6 3.7 6.5 2.6 7.5C2.4 7.7 2.1 7.8 1.8 7.8C1.5 7.8 1.2 7.7 1 7.5L0.1 6.7C-0.2 6.4-0.1 5.9 0.2 5.6C1.7 3.9 3.9 2.8 6.4 2.5H8H6.4C3.9 2.8 1.7 3.9 0.2 5.6C-0.1 5.9-0.2 6.4 0.1 6.7L1 7.5C1.2 7.7 1.5 7.8 1.8 7.8C2.1 7.8 2.4 7.7 2.6 7.5C3.7 6.5 5.3 6 7 6C8.7 6 10.3 6.5 11.4 7.5C11.6 7.7 11.9 7.8 12.2 7.8C12.5 7.8 12.8 7.7 13 7.5L14.2 6.4C14.5 6.1 14.5 5.6 14.2 5.3C12.7 3.6 10.5 2.5 8 2.5Z"/>
+          </svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor">
+            <rect x="0.5" y="0.5" width="21" height="11" rx="2.5" stroke="currentColor" fill="none"/>
+            <rect x="2" y="2" width="17" height="8" rx="1" fill="currentColor"/>
+            <path d="M23 4V8C24 7.5 24 4.5 23 4Z"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="pages-container">
+        <!-- Chat Page -->
+        <div class="page active" id="page-chat">
+          <div class="chat-header">
+            <h1>Hermes</h1>
+          </div>
+          <div class="messages-list" id="messagesList">
+            <div class="message ai">
+              你好！我是Hermes，你的智能助手。有什么我可以帮你的吗？
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <div class="chat-input-wrapper">
+              <textarea class="chat-input" id="chatInput" placeholder="输入消息..." rows="1"></textarea>
+              <button class="send-btn" id="sendBtn">
+                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Experts Page -->
+        <div class="page" id="page-experts">
+          <div class="page-header">
+            <h2>专家团</h2>
+            <p>已创建 3 位专家</p>
+          </div>
+          <div class="experts-list">
+            <div class="expert-card">
+              <div class="expert-avatar">👨‍💻</div>
+              <div class="expert-info">
+                <div class="expert-name">代码专家</div>
+                <div class="expert-role">全栈开发 · Senior</div>
+                <div class="expert-desc">擅长前端React/Vue，后端Node.js/Python，数据库设计与优化</div>
+              </div>
+            </div>
+            <div class="expert-card">
+              <div class="expert-avatar">📊</div>
+              <div class="expert-info">
+                <div class="expert-name">数据分析</div>
+                <div class="expert-role">数据科学 · Expert</div>
+                <div class="expert-desc">精通Python数据分析、Pandas、机器学习与可视化</div>
+              </div>
+            </div>
+            <div class="expert-card">
+              <div class="expert-avatar">🎨</div>
+              <div class="expert-info">
+                <div class="expert-name">产品设计</div>
+                <div class="expert-role">UX/UI设计 · Lead</div>
+                <div class="expert-desc">专注用户体验设计、交互原型、Figma专业户</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workflow Page -->
+        <div class="page" id="page-workflow">
+          <div class="page-header">
+            <h2>工作流</h2>
+            <p>已保存 3 个工作流</p>
+          </div>
+          <div class="workflow-list">
+            <div class="workflow-card">
+              <div class="workflow-card-header">
+                <div class="workflow-icon">🚀</div>
+                <div>
+                  <div class="workflow-title">代码审查流程</div>
+                  <div class="workflow-meta">上次使用: 2小时前</div>
+                </div>
+              </div>
+              <div class="workflow-steps">
+                <span class="workflow-step">代码提交</span>
+                <span class="workflow-step">静态分析</span>
+                <span class="workflow-step">安全扫描</span>
+                <span class="workflow-step">生成报告</span>
+              </div>
+            </div>
+            <div class="workflow-card">
+              <div class="workflow-card-header">
+                <div class="workflow-icon">📧</div>
+                <div>
+                  <div class="workflow-title">周报生成器</div>
+                  <div class="workflow-meta">上次使用: 昨天</div>
+                </div>
+              </div>
+              <div class="workflow-steps">
+                <span class="workflow-step">收集数据</span>
+                <span class="workflow-step">汇总分析</span>
+                <span class="workflow-step">生成文案</span>
+              </div>
+            </div>
+            <div class="workflow-card">
+              <div class="workflow-card-header">
+                <div class="workflow-icon">🔍</div>
+                <div>
+                  <div class="workflow-title">竞品分析</div>
+                  <div class="workflow-meta">上次使用: 3天前</div>
+                </div>
+              </div>
+              <div class="workflow-steps">
+                <span class="workflow-step">抓取数据</span>
+                <span class="workflow-step">对比分析</span>
+                <span class="workflow-step">可视化</span>
+                <span class="workflow-step">导出报告</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div class="page" id="page-settings">
+          <div class="page-header">
+            <h2>设置</h2>
+          </div>
+          <div class="settings-list">
+            <div class="settings-section">
+              <div class="settings-section-title">模型配置</div>
+              <div class="settings-card">
+                <div class="settings-item" onclick="cycleModel()">
+                  <div class="settings-item-left">
+                    <div class="settings-item-icon purple">🤖</div>
+                    <span class="settings-item-label">AI 模型</span>
+                  </div>
+                  <div class="settings-item-value" id="modelValue">Claude 3.5</div>
+                </div>
+                <div class="settings-item">
+                  <div class="settings-item-left">
+                    <div class="settings-item-icon blue">💬</div>
+                    <span class="settings-item-label">上下文窗口</span>
+                  </div>
+                  <div class="settings-item-value">200K</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-title">偏好设置</div>
+              <div class="settings-card">
+                <div class="settings-item">
+                  <div class="settings-item-left">
+                    <div class="settings-item-icon green">🌙</div>
+                    <span class="settings-item-label">深色模式</span>
+                  </div>
+                  <div class="toggle-switch active" id="darkModeToggle" onclick="toggleDarkMode()"></div>
+                </div>
+                <div class="settings-item">
+                  <div class="settings-item-left">
+                    <div class="settings-item-icon orange">🔔</div>
+                    <span class="settings-item-label">消息通知</span>
+                  </div>
+                  <div class="toggle-switch active"></div>
+                </div>
+                <div class="settings-item">
+                  <div class="settings-item-left">
+                    <div class="settings-item-icon red">🎤</div>
+                    <span class="settings-item-label">语音输入</span>
+                  </div>
+                  <div class="toggle-switch"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-title">关于</div>
+              <div class="about-card">
+                <div class="about-logo">✦</div>
+                <div class="about-name">Hermes</div>
+                <div class="about-version">版本 1.0.0</div>
+                <div class="about-desc">下一代智能体协作平台，让AI成为你最可靠的助手</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Navigation -->
+      <nav class="bottom-nav">
+        <div class="nav-item active" data-page="chat">
+          <span class="nav-item-icon">💬</span>
+          <span class="nav-item-label">对话</span>
+        </div>
+        <div class="nav-item" data-page="experts">
+          <span class="nav-item-icon">🧑‍💼</span>
+          <span class="nav-item-label">专家团</span>
+        </div>
+        <div class="nav-item" data-page="workflow">
+          <span class="nav-item-icon">🔧</span>
+          <span class="nav-item-label">工作流</span>
+        </div>
+        <div class="nav-item" data-page="settings">
+          <span class="nav-item-icon">⚙️</span>
+          <span class="nav-item-label">设置</span>
+        </div>
+      </nav>
+    </div>
+  </div>
+
+  <script>
+    // Navigation
+    const navItems = document.querySelectorAll('.nav-item');
+    const pages = document.querySelectorAll('.page');
+
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const pageId = item.dataset.page;
+
+        navItems.forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+
+        pages.forEach(p => p.classList.remove('active'));
+        document.getElementById('page-' + pageId).classList.add('active');
+      });
+    });
+
+    // Chat functionality
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const messagesList = document.getElementById('messagesList');
+
+    const aiResponses = [
+      "这是一个很有趣的问题！让我来分析一下...",
+      "我理解你的需求。让我帮你查找相关信息。",
+      "根据我的分析，这个问题可以从多个角度来看待。",
+      "好的，我来帮你处理这个任务。",
+      "这个想法很棒！让我进一步说明...",
+      "让我为你创建一个解决方案。",
+      "我已经理解了你的问题，这是我的建议...",
+      "从技术角度来看，我们可以这样处理...",
+    ];
+
+    function autoResize() {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
+    }
+
+    chatInput.addEventListener('input', autoResize);
+
+    function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      // Add user message
+      const userMsg = document.createElement('div');
+      userMsg.className = 'message user';
+      userMsg.textContent = text;
+      messagesList.appendChild(userMsg);
+
+      chatInput.value = '';
+      autoResize();
+
+      // Scroll to bottom
+      setTimeout(() => {
+        messagesList.scrollTop = messagesList.scrollHeight;
+      }, 10);
+
+      // Show typing indicator
+      const typing = document.createElement('div');
+      typing.className = 'typing-indicator';
+      typing.innerHTML = '<span></span><span></span><span></span>';
+      messagesList.appendChild(typing);
+
+      setTimeout(() => {
+        typing.remove();
+
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'message ai';
+        aiMsg.textContent = aiResponses[Math.floor(Math.random() * aiResponses.length)];
+        messagesList.appendChild(aiMsg);
+
+        messagesList.scrollTop = messagesList.scrollHeight;
+      }, 1000 + Math.random() * 1000);
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Settings functionality
+    const models = ['Claude 3.5', 'Claude 3', 'GPT-4', 'Gemini Pro'];
+    let currentModelIndex = 0;
+
+    function cycleModel() {
+      currentModelIndex = (currentModelIndex + 1) % models.length;
+      document.getElementById('modelValue').textContent = models[currentModelIndex];
+    }
+
+    function toggleDarkMode() {
+      const toggle = document.getElementById('darkModeToggle');
+      toggle.classList.toggle('active');
+    }
+
+    // Toggle switches
+    document.querySelectorAll('.toggle-switch').forEach(toggle => {
+      if (toggle.id !== 'darkModeToggle') {
+        toggle.addEventListener('click', () => {
+          toggle.classList.toggle('active');
+        });
+      }
+    });
+  </script>
+</body>
+</html>

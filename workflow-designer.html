@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可视化工作流设计器</title>
+<style>
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: rgba(22, 22, 35, 0.85);
+  --bg-card-hover: rgba(35, 35, 55, 0.9);
+  --border-color: rgba(99, 102, 241, 0.3);
+  --border-glow: rgba(99, 102, 241, 0.6);
+  --text-primary: #e4e4f0;
+  --text-secondary: #8888a0;
+  --accent-blue: #6366f1;
+  --accent-purple: #8b5cf6;
+  --accent-green: #10b981;
+  --accent-orange: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-cyan: #06b6d4;
+  --accent-pink: #ec4899;
+  --frost-blur: 20px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  background-image:
+    radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  position: relative;
+}
+
+/* Header */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: rgba(10, 10, 15, 0.8);
+  backdrop-filter: blur(var(--frost-blur));
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 100;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  border: none;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 25px rgba(99, 102, 241, 0.4);
+}
+
+.btn-danger {
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.btn-danger:hover {
+  border-color: var(--accent-red);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+/* Left Sidebar - Node Toolbox */
+.toolbox {
+  position: fixed;
+  left: 16px;
+  top: 72px;
+  width: 220px;
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--frost-blur));
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 50;
+}
+
+.toolbox-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.toolbox-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(30, 30, 50, 0.6);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: grab;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.toolbox-item:hover {
+  background: rgba(50, 50, 80, 0.7);
+  border-color: var(--border-color);
+  transform: translateX(4px);
+}
+
+.toolbox-item:active {
+  cursor: grabbing;
+}
+
+.toolbox-item .icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.toolbox-item.start-end .icon { background: linear-gradient(135deg, var(--accent-green), #059669); }
+.toolbox-item.ai .icon { background: linear-gradient(135deg, var(--accent-purple), #7c3aed); }
+.toolbox-item.condition .icon { background: linear-gradient(135deg, var(--accent-orange), #d97706); }
+.toolbox-item.data .icon { background: linear-gradient(135deg, var(--accent-cyan), #0891b2); }
+.toolbox-item.notification .icon { background: linear-gradient(135deg, var(--accent-pink), #db2777); }
+.toolbox-item.delay .icon { background: linear-gradient(135deg, var(--accent-blue), #4f46e5); }
+
+/* Canvas */
+.canvas-container {
+  flex: 1;
+  margin: 72px 16px 16px 248px;
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.03) 0%, transparent 70%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(99, 102, 241, 0.05) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(99, 102, 241, 0.05) 40px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.canvas-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.canvas-hint-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.3;
+}
+
+.canvas-hint-text {
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+/* SVG Connections */
+.connections-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.connection-line {
+  fill: none;
+  stroke: var(--accent-blue);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.5));
+}
+
+.connection-line.temp {
+  stroke: var(--accent-purple);
+  stroke-dasharray: 8 4;
+}
+
+.connection-line.conditional {
+  stroke: var(--accent-orange);
+}
+
+/* Nodes */
+.node {
+  position: absolute;
+  min-width: 180px;
+  max-width: 240px;
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--frost-blur));
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: move;
+  z-index: 10;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.node:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+}
+
+.node.selected {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.3);
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.node-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.node-icon.start-end { background: linear-gradient(135deg, var(--accent-green), #059669); }
+.node-icon.ai { background: linear-gradient(135deg, var(--accent-purple), #7c3aed); }
+.node-icon.condition { background: linear-gradient(135deg, var(--accent-orange), #d97706); }
+.node-icon.data { background: linear-gradient(135deg, var(--accent-cyan), #0891b2); }
+.node-icon.notification { background: linear-gradient(135deg, var(--accent-pink), #db2777); }
+.node-icon.delay { background: linear-gradient(135deg, var(--accent-blue), #4f46e5); }
+
+.node-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-body {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.node-param {
+  margin-bottom: 6px;
+}
+
+.node-param:last-child {
+  margin-bottom: 0;
+}
+
+.node-param-label {
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.node-param-value {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--text-primary);
+}
+
+/* Connection Points */
+.node-ports {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.port {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 2px solid var(--accent-blue);
+  cursor: crosshair;
+  transition: all 0.2s ease;
+}
+
+.port:hover {
+  background: var(--accent-blue);
+  box-shadow: 0 0 10px var(--accent-blue);
+  transform: scale(1.3);
+}
+
+.port.output {
+  border-color: var(--accent-green);
+}
+
+.port.output:hover {
+  background: var(--accent-green);
+  box-shadow: 0 0 10px var(--accent-green);
+}
+
+/* Condition branch labels */
+.branch-labels {
+  display: flex;
+  justify-content: space-around;
+  padding: 4px 12px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.branch-label {
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+/* Node Edit Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal {
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--frost-blur));
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90vw;
+  transform: scale(0.9);
+  transition: transform 0.2s ease;
+}
+
+.modal-overlay.active .modal {
+  transform: scale(1);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 300;
+}
+
+.toast {
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--frost-blur));
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-top: 8px;
+  font-size: 13px;
+  animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast.success {
+  border-color: var(--accent-green);
+}
+
+.toast.error {
+  border-color: var(--accent-red);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateX(50%);
+  }
+}
+
+/* JSON Modal */
+.json-modal .modal {
+  width: 600px;
+}
+
+.json-preview {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 400px;
+  overflow: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--accent-cyan);
+}
+
+/* Dragging state */
+.canvas.drag-over {
+  background-color: rgba(99, 102, 241, 0.05);
+}
+
+.node.dragging {
+  opacity: 0.8;
+  z-index: 100;
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-title">可视化工作流设计器</div>
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="runWorkflow()">▶ 运行</button>
+    <button class="btn" onclick="saveWorkflow()">💾 保存</button>
+    <button class="btn" onclick="exportJSON()">📥 导出JSON</button>
+    <button class="btn btn-danger" onclick="clearCanvas()">🗑 清空</button>
+  </div>
+</header>
+
+<div class="app-container">
+  <aside class="toolbox">
+    <div class="toolbox-title">节点工具箱</div>
+
+    <div class="toolbox-item start-end" draggable="true" data-type="start">
+      <div class="icon">▶</div>
+      <span>开始节点</span>
+    </div>
+
+    <div class="toolbox-item start-end" draggable="true" data-type="end">
+      <div class="icon">■</div>
+      <span>结束节点</span>
+    </div>
+
+    <div class="toolbox-item ai" draggable="true" data-type="ai">
+      <div class="icon">🤖</div>
+      <span>AI处理节点</span>
+    </div>
+
+    <div class="toolbox-item condition" draggable="true" data-type="condition">
+      <div class="icon">⚡</div>
+      <span>条件判断节点</span>
+    </div>
+
+    <div class="toolbox-item data" draggable="true" data-type="data">
+      <div class="icon">📥</div>
+      <span>数据输入节点</span>
+    </div>
+
+    <div class="toolbox-item notification" draggable="true" data-type="notification">
+      <div class="icon">🔔</div>
+      <span>通知节点</span>
+    </div>
+
+    <div class="toolbox-item delay" draggable="true" data-type="delay">
+      <div class="icon">⏱</div>
+      <span>延迟等待节点</span>
+    </div>
+  </aside>
+
+  <div class="canvas-container">
+    <div class="canvas" id="canvas">
+      <svg class="connections-svg" id="connectionsSvg"></svg>
+      <div class="canvas-hint" id="canvasHint">
+        <div class="canvas-hint-icon">📋</div>
+        <div class="canvas-hint-text">从左侧拖拽节点到此处开始设计</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Node Edit Modal -->
+<div class="modal-overlay" id="nodeEditModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">编辑节点</div>
+      <button class="modal-close" onclick="closeNodeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">节点名称</label>
+        <input type="text" class="form-input" id="nodeName" placeholder="输入节点名称">
+      </div>
+      <div class="form-group" id="paramContainer">
+        <!-- Dynamic parameters -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeNodeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveNodeEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- JSON Export Modal -->
+<div class="modal-overlay json-modal" id="jsonModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">导出的工作流 JSON</div>
+      <button class="modal-close" onclick="closeJsonModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="json-preview" id="jsonPreview"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeJsonModal()">关闭</button>
+      <button class="btn btn-primary" onclick="copyJSON()">📋 复制</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// State
+let nodes = [];
+let connections = [];
+let selectedNode = null;
+let editingNodeId = null;
+let tempConnection = null;
+let isDraggingNode = false;
+let draggedNodeType = null;
+
+// Node type configurations
+const nodeConfigs = {
+  start: {
+    title: '开始节点',
+    icon: 'start-end',
+    iconSymbol: '▶',
+    params: []
+  },
+  end: {
+    title: '结束节点',
+    icon: 'start-end',
+    iconSymbol: '■',
+    params: []
+  },
+  ai: {
+    title: 'AI处理节点',
+    icon: 'ai',
+    iconSymbol: '🤖',
+    params: [
+      { key: 'model', label: '模型', type: 'select', options: ['claude-3-5-sonnet', 'gpt-4', 'gpt-3.5-turbo', 'gemini-pro'] },
+      { key: 'prompt', label: '提示词', type: 'textarea', placeholder: '输入AI处理指令...' },
+      { key: 'temperature', label: '温度参数', type: 'select', options: ['0.0 (精确)', '0.5 (平衡)', '0.9 (创意)'] }
+    ]
+  },
+  condition: {
+    title: '条件判断节点',
+    icon: 'condition',
+    iconSymbol: '⚡',
+    params: [
+      { key: 'field', label: '判断字段', type: 'input', placeholder: '例如: status' },
+      { key: 'operator', label: '运算符', type: 'select', options: ['==', '!=', '>', '<', '>=', '<=', '包含', '不包含'] },
+      { key: 'value', label: '比较值', type: 'input', placeholder: '例如: success' }
+    ]
+  },
+  data: {
+    title: '数据输入节点',
+    icon: 'data',
+    iconSymbol: '📥',
+    params: [
+      { key: 'source', label: '数据源', type: 'select', options: ['用户输入', 'API调用', '文件读取', '数据库查询'] },
+      { key: 'schema', label: '数据Schema', type: 'textarea', placeholder: '例如: {"name": "string", "age": "number"}' },
+      { key: 'sample', label: '示例数据', type: 'textarea', placeholder: '输入示例数据...' }
+    ]
+  },
+  notification: {
+    title: '通知节点',
+    icon: 'notification',
+    iconSymbol: '🔔',
+    params: [
+      { key: 'channel', label: '通知渠道', type: 'select', options: ['邮件', '短信', 'Webhook', '钉钉', '企业微信'] },
+      { key: 'template', label: '消息模板', type: 'textarea', placeholder: '例如: 任务完成通知: {{taskName}}' },
+      { key: 'recipients', label: '接收人', type: 'input', placeholder: '例如: admin@example.com' }
+    ]
+  },
+  delay: {
+    title: '延迟等待节点',
+    icon: 'delay',
+    iconSymbol: '⏱',
+    params: [
+      { key: 'duration', label: '延迟时间', type: 'input', placeholder: '例如: 5000' },
+      { key: 'unit', label: '时间单位', type: 'select', options: ['毫秒', '秒', '分钟', '小时'] }
+    ]
+  }
+};
+
+// Generate unique ID
+function generateId() {
+  return 'node_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Show toast notification
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${type === 'success' ? '✓' : '✕'}</span> ${message}`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Initialize toolbox drag events
+document.querySelectorAll('.toolbox-item').forEach(item => {
+  item.addEventListener('dragstart', (e) => {
+    draggedNodeType = e.target.closest('.toolbox-item').dataset.type;
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+});
+
+// Canvas drag events
+const canvas = document.getElementById('canvas');
+const canvasHint = document.getElementById('canvasHint');
+
+canvas.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  canvas.classList.add('drag-over');
+});
+
+canvas.addEventListener('dragleave', () => {
+  canvas.classList.remove('drag-over');
+});
+
+canvas.addEventListener('drop', (e) => {
+  e.preventDefault();
+  canvas.classList.remove('drag-over');
+
+  if (draggedNodeType) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left - 90;
+    const y = e.clientY - rect.top - 30;
+    createNode(draggedNodeType, Math.max(0, x), Math.max(0, y));
+    draggedNodeType = null;
+  }
+});
+
+// Create node
+function createNode(type, x, y) {
+  const id = generateId();
+  const config = nodeConfigs[type];
+
+  const node = {
+    id,
+    type,
+    name: config.title,
+    params: {},
+    x,
+    y
+  };
+
+  // Initialize default params
+  config.params.forEach(p => {
+    node.params[p.key] = '';
+  });
+
+  nodes.push(node);
+  renderNode(node);
+  updateCanvasHint();
+}
+
+// Render single node
+function renderNode(node) {
+  const config = nodeConfigs[node.type];
+
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.id = node.id;
+  el.style.left = node.x + 'px';
+  el.style.top = node.y + 'px';
+
+  let bodyContent = '';
+
+  if (config.params.length > 0) {
+    bodyContent = '<div class="node-body">';
+    config.params.slice(0, 2).forEach(p => {
+      const val = node.params[p.key] || '—';
+      bodyContent += `
+        <div class="node-param">
+          <div class="node-param-label">${p.label}</div>
+          <div class="node-param-value">${escapeHtml(val)}</div>
+        </div>
+      `;
+    });
+    bodyContent += '</div>';
+  }
+
+  let branchLabels = '';
+  if (node.type === 'condition') {
+    branchLabels = `
+      <div class="branch-labels">
+        <span class="branch-label">是</span>
+        <span class="branch-label">否</span>
+      </div>
+    `;
+  }
+
+  el.innerHTML = `
+    <div class="node-header">
+      <div class="node-icon ${config.icon}">${config.iconSymbol}</div>
+      <div class="node-title">${escapeHtml(node.name)}</div>
+    </div>
+    ${bodyContent}
+    <div class="node-ports">
+      <div class="port input" data-node="${node.id}" data-port="input"></div>
+      <div class="port output" data-node="${node.id}" data-port="output"></div>
+    </div>
+    ${branchLabels}
+  `;
+
+  // Make node draggable on canvas
+  makeNodeDraggable(el, node);
+
+  // Click to edit
+  el.addEventListener('click', (e) => {
+    if (!isDraggingNode) {
+      e.stopPropagation();
+      openNodeModal(node.id);
+    }
+  });
+
+  // Port connection events
+  el.querySelectorAll('.port').forEach(port => {
+    port.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      startConnection(e, node.id, port.dataset.port);
+    });
+  });
+
+  canvas.appendChild(el);
+}
+
+// Make node draggable
+function makeNodeDraggable(el, node) {
+  let isDragging = false;
+  let startX, startY, nodeStartX, nodeStartY;
+
+  el.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('port')) return;
+    if (e.target.classList.contains('node-ports')) return;
+
+    isDragging = true;
+    isDraggingNode = true;
+    el.classList.add('dragging');
+
+    startX = e.clientX;
+    startY = e.clientY;
+    nodeStartX = node.x;
+    nodeStartY = node.y;
+
+    // Deselect other nodes
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedNode = node.id;
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    node.x = Math.max(0, nodeStartX + dx);
+    node.y = Math.max(0, nodeStartY + dy);
+
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+
+    renderConnections();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      isDraggingNode = false;
+      el.classList.remove('dragging');
+    }
+  });
+}
+
+// Connection handling
+let connectionStart = null;
+let connectionStartPort = null;
+
+function startConnection(e, nodeId, portType) {
+  connectionStart = nodeId;
+  connectionStartPort = portType;
+
+  const svg = document.getElementById('connectionsSvg');
+  const rect = canvas.getBoundingClientRect();
+
+  const startNode = document.querySelector(`[data-node="${nodeId}"][data-port="${portType}"]`);
+  const startRect = startNode.getBoundingClientRect();
+
+  tempConnection = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  tempConnection.setAttribute('class', 'connection-line temp');
+  svg.appendChild(tempConnection);
+
+  updateTempConnection(e);
+
+  document.addEventListener('mousemove', updateTempConnection);
+  document.addEventListener('mouseup', endConnection);
+}
+
+function updateTempConnection(e) {
+  if (!tempConnection) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const startNode = document.querySelector(`[data-node="${connectionStart}"][data-port="${connectionStartPort}"]`);
+  const startRect = startNode.getBoundingClientRect();
+
+  const sx = startRect.left + startRect.width / 2 - rect.left;
+  const sy = startRect.top + startRect.height / 2 - rect.top;
+  const ex = e.clientX - rect.left;
+  const ey = e.clientY - rect.top;
+
+  const path = createBezierPath(sx, sy, ex, ey);
+  tempConnection.setAttribute('d', path);
+}
+
+function endConnection(e) {
+  document.removeEventListener('mousemove', updateTempConnection);
+  document.removeEventListener('mouseup', endConnection);
+
+  if (tempConnection) {
+    tempConnection.remove();
+    tempConnection = null;
+  }
+
+  // Check if we're over a port
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  if (target && target.classList.contains('port')) {
+    const targetNode = target.dataset.node;
+    const targetPort = target.dataset.port;
+
+    if (connectionStart !== targetNode && connectionStartPort !== targetPort) {
+      // Validate connection (output to input only)
+      if ((connectionStartPort === 'output' && targetPort === 'input') ||
+          (connectionStartPort === 'input' && targetPort === 'output')) {
+        createConnection(connectionStart, targetNode);
+      }
+    }
+  }
+
+  connectionStart = null;
+  connectionStartPort = null;
+}
+
+function createConnection(fromId, toId) {
+  // Check if connection already exists
+  const exists = connections.some(c =>
+    (c.from === fromId && c.to === toId) ||
+    (c.from === toId && c.to === fromId)
+  );
+
+  if (exists) return;
+
+  connections.push({ from: fromId, to: toId });
+  renderConnections();
+  showToast('连接已创建');
+}
+
+function renderConnections() {
+  const svg = document.getElementById('connectionsSvg');
+  svg.innerHTML = '';
+
+  connections.forEach(conn => {
+    const fromNode = document.getElementById(conn.from);
+    const toNode = document.getElementById(conn.to);
+
+    if (!fromNode || !toNode) return;
+
+    const fromPort = fromNode.querySelector('.port.output');
+    const toPort = toNode.querySelector('.port.input');
+
+    if (!fromPort || !toPort) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const fromRect = fromPort.getBoundingClientRect();
+    const toRect = toPort.getBoundingClientRect();
+
+    const sx = fromRect.left + fromRect.width / 2 - rect.left;
+    const sy = fromRect.top + fromRect.height / 2 - rect.top;
+    const ex = toRect.left + toRect.width / 2 - rect.left;
+    const ey = toRect.top + toRect.height / 2 - rect.top;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+    const fromNodeData = nodes.find(n => n.id === conn.from);
+    const isConditional = fromNodeData && fromNodeData.type === 'condition';
+
+    path.setAttribute('class', `connection-line ${isConditional ? 'conditional' : ''}`);
+    path.setAttribute('d', createBezierPath(sx, sy, ex, ey));
+    svg.appendChild(path);
+  });
+}
+
+function createBezierPath(sx, sy, ex, ey) {
+  const dx = Math.abs(ex - sx);
+  const cp = Math.max(dx * 0.5, 50);
+  return `M ${sx} ${sy} C ${sx + cp} ${sy}, ${ex - cp} ${ey}, ${ex} ${ey}`;
+}
+
+// Node modal
+function openNodeModal(nodeId) {
+  editingNodeId = nodeId;
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node) return;
+
+  const config = nodeConfigs[node.type];
+
+  document.getElementById('modalTitle').textContent = '编辑 ' + config.title;
+  document.getElementById('nodeName').value = node.name;
+
+  const paramContainer = document.getElementById('paramContainer');
+  paramContainer.innerHTML = '';
+
+  config.params.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'form-group';
+
+    let inputHtml = '';
+    if (p.type === 'select') {
+      inputHtml = `
+        <select class="form-select" id="param_${p.key}">
+          ${p.options.map(opt => `<option value="${opt}" ${node.params[p.key] === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+        </select>
+      `;
+    } else if (p.type === 'textarea') {
+      inputHtml = `<textarea class="form-textarea" id="param_${p.key}" placeholder="${p.placeholder || ''}">${node.params[p.key] || ''}</textarea>`;
+    } else {
+      inputHtml = `<input type="text" class="form-input" id="param_${p.key}" value="${node.params[p.key] || ''}" placeholder="${p.placeholder || ''}">`;
+    }
+
+    div.innerHTML = `<label class="form-label">${p.label}</label>${inputHtml}`;
+    paramContainer.appendChild(div);
+  });
+
+  document.getElementById('nodeEditModal').classList.add('active');
+}
+
+function closeNodeModal() {
+  document.getElementById('nodeEditModal').classList.remove('active');
+  editingNodeId = null;
+}
+
+function saveNodeEdit() {
+  const node = nodes.find(n => n.id === editingNodeId);
+  if (!node) return;
+
+  node.name = document.getElementById('nodeName').value || nodeConfigs[node.type].title;
+
+  const config = nodeConfigs[node.type];
+  config.params.forEach(p => {
+    const input = document.getElementById('param_' + p.key);
+    if (input) {
+      node.params[p.key] = input.value;
+    }
+  });
+
+  // Re-render node
+  const el = document.getElementById(node.id);
+  if (el) el.remove();
+  renderNode(node);
+  renderConnections();
+
+  closeNodeModal();
+  showToast('节点已保存');
+}
+
+// Click canvas to deselect
+canvas.addEventListener('click', (e) => {
+  if (e.target === canvas || e.target.classList.contains('canvas-hint') || e.target.closest('.canvas-hint')) {
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+    selectedNode = null;
+  }
+});
+
+// Workflow actions
+function runWorkflow() {
+  if (nodes.length === 0) {
+    showToast('请先添加节点', 'error');
+    return;
+  }
+
+  const hasStart = nodes.some(n => n.type === 'start');
+  const hasEnd = nodes.some(n => n.type === 'end');
+
+  if (!hasStart) {
+    showToast('工作流必须有开始节点', 'error');
+    return;
+  }
+
+  if (!hasEnd) {
+    showToast('工作流必须有结束节点', 'error');
+    return;
+  }
+
+  showToast('工作流开始运行...');
+
+  // Simulate execution
+  simulateExecution();
+}
+
+function simulateExecution() {
+  const startNode = nodes.find(n => n.type === 'start');
+  let currentNode = startNode;
+
+  const step = () => {
+    if (!currentNode) return;
+
+    const el = document.getElementById(currentNode.id);
+    if (el) {
+      el.style.boxShadow = '0 0 30px rgba(16, 185, 129, 0.6)';
+      setTimeout(() => {
+        if (el) el.style.boxShadow = '';
+      }, 1000);
+    }
+
+    // Find next node
+    const conn = connections.find(c => c.from === currentNode.id);
+    if (conn) {
+      const nextNode = nodes.find(n => n.id === conn.to);
+      setTimeout(() => {
+        currentNode = nextNode;
+        if (currentNode.type !== 'end') {
+          step();
+        } else {
+          showToast('工作流执行完成！');
+        }
+      }, 800);
+    } else if (currentNode.type !== 'end') {
+      showToast('工作流未连接到结束节点', 'error');
+    }
+  };
+
+  step();
+}
+
+function saveWorkflow() {
+  if (nodes.length === 0) {
+    showToast('没有可保存的工作流', 'error');
+    return;
+  }
+
+  const workflow = {
+    name: '未命名工作流',
+    version: '1.0.0',
+    createdAt: new Date().toISOString(),
+    nodes: nodes.map(n => ({
+      id: n.id,
+      type: n.type,
+      name: n.name,
+      params: n.params,
+      position: { x: n.x, y: n.y }
+    })),
+    connections: connections.map(c => ({
+      from: c.from,
+      to: c.to
+    }))
+  };
+
+  localStorage.setItem('workflow_designer_data', JSON.stringify(workflow));
+  showToast('工作流已保存到本地存储');
+}
+
+function exportJSON() {
+  if (nodes.length === 0) {
+    showToast('没有可导出的工作流', 'error');
+    return;
+  }
+
+  const workflow = {
+    name: '工作流导出',
+    version: '1.0.0',
+    exportedAt: new Date().toISOString(),
+    nodes: nodes.map(n => ({
+      id: n.id,
+      type: n.type,
+      name: n.name,
+      params: n.params,
+      position: { x: n.x, y: n.y }
+    })),
+    connections: connections.map(c => ({
+      from: c.from,
+      to: c.to
+    }))
+  };
+
+  document.getElementById('jsonPreview').textContent = JSON.stringify(workflow, null, 2);
+  document.getElementById('jsonModal').classList.add('active');
+}
+
+function closeJsonModal() {
+  document.getElementById('jsonModal').classList.remove('active');
+}
+
+function copyJSON() {
+  const json = document.getElementById('jsonPreview').textContent;
+  navigator.clipboard.writeText(json).then(() => {
+    showToast('JSON已复制到剪贴板');
+  }).catch(() => {
+    showToast('复制失败', 'error');
+  });
+}
+
+function clearCanvas() {
+  if (nodes.length === 0) return;
+
+  if (confirm('确定要清空画布吗？此操作不可撤销。')) {
+    nodes.forEach(n => {
+      const el = document.getElementById(n.id);
+      if (el) el.remove();
+    });
+    nodes = [];
+    connections = [];
+    renderConnections();
+    updateCanvasHint();
+    showToast('画布已清空');
+  }
+}
+
+function updateCanvasHint() {
+  canvasHint.style.display = nodes.length === 0 ? 'block' : 'none';
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Load saved workflow on start
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('workflow_designer_data');
+  if (saved) {
+    try {
+      const workflow = JSON.parse(saved);
+      if (workflow.nodes && workflow.nodes.length > 0) {
+        workflow.nodes.forEach(n => {
+          nodes.push({
+            id: n.id,
+            type: n.type,
+            name: n.name,
+            params: n.params || {},
+            x: n.position?.x || 100,
+            y: n.position?.y || 100
+          });
+          renderNode(nodes[nodes.length - 1]);
+        });
+
+        if (workflow.connections) {
+          connections = workflow.connections;
+          renderConnections();
+        }
+
+        updateCanvasHint();
+        showToast('已加载保存的工作流');
+      }
+    } catch (e) {
+      console.error('Failed to load workflow:', e);
+    }
+  }
+});
+
+// Close modals on escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeNodeModal();
+    closeJsonModal();
+  }
+});
+</script>
+
+</body>
+</html>

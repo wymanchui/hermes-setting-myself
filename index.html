@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes — 专家团协作系统</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d12;
+    --surface: rgba(255,255,255,0.04);
+    --surface-hover: rgba(255,255,255,0.07);
+    --border: rgba(255,255,255,0.08);
+    --text: #e8e8ed;
+    --text-muted: rgba(232,232,237,0.45);
+    --accent: #6c63ff;
+    --accent-glow: rgba(108,99,255,0.35);
+    --green: #3dd68c;
+    --yellow: #f5c842;
+    --red: #f5604a;
+    --glass-bg: rgba(255,255,255,0.025);
+    --glass-border: rgba(255,255,255,0.07);
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* subtle background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(108,99,255,0.08) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(61,214,140,0.05) 0%, transparent 50%),
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .header .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .header .logo-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+
+  .header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .header p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 28px;
+    padding: 16px 20px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(20px);
+  }
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .tag {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(108,99,255,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(108,99,255,0.25);
+    font-weight: 500;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    background: var(--surface-hover);
+    border-color: rgba(255,255,255,0.15);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 18px var(--accent-glow);
+  }
+
+  .btn-primary:hover {
+    background: #7c74ff;
+    border-color: #7c74ff;
+    box-shadow: 0 0 28px var(--accent-glow);
+  }
+
+  .btn-danger {
+    color: var(--red);
+    border-color: rgba(245,96,74,0.3);
+    background: rgba(245,96,74,0.08);
+  }
+
+  .btn-danger:hover {
+    background: rgba(245,96,74,0.15);
+  }
+
+  .btn svg { flex-shrink: 0; }
+
+  /* ── Expert Grid ── */
+  .experts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  /* ── Expert Card ── */
+  .expert-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 20px;
+    backdrop-filter: blur(20px);
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .expert-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .expert-card:hover {
+    border-color: rgba(255,255,255,0.13);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  .expert-card:hover::before { opacity: 1; }
+
+  .expert-card.in-meeting {
+    border-color: rgba(61,214,140,0.3);
+    box-shadow: 0 0 20px rgba(61,214,140,0.08);
+  }
+
+  .expert-card.in-meeting::before {
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    opacity: 1;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  .avatar::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 2px solid var(--bg);
+    transition: background 0.3s;
+  }
+
+  .avatar.working::after { background: var(--yellow); animation: pulse 1.5s infinite; }
+  .avatar.offline::after { background: var(--text-muted); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
+  }
+
+  .card-info h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .card-info .role-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+
+  .role-code      { background: rgba(99,179,237,0.15); color: #67b3ed; border: 1px solid rgba(99,179,237,0.2); }
+  .role-arch      { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.2); }
+  .role-test      { background: rgba(61,214,140,0.15);  color: #3dd68c; border: 1px solid rgba(61,214,140,0.2); }
+  .role-security  { background: rgba(245,101,101,0.15); color: #f5604a; border: 1px solid rgba(245,101,101,0.2); }
+  .role-product   { background: rgba(245,198,66,0.15);  color: #f5c842; border: 1px solid rgba(245,198,66,0.2); }
+  .role-devops    { background: rgba(245,167,66,0.15); color: #f5a742; border: 1px solid rgba(245,167,66,0.2); }
+  .role-data      { background: rgba(99,210,255,0.15); color: #63d2ff; border: 1px solid rgba(99,210,255,0.2); }
+  .role-ux        { background: rgba(248,113,180,0.15); color: #f871b4; border: 1px solid rgba(248,113,180,0.2); }
+
+  .expert-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin-bottom: 14px;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  .status-dot.active { background: var(--green); }
+  .status-dot.busy   { background: var(--yellow); animation: pulse 1.5s infinite; }
+
+  /* ── Meeting Panel ── */
+  .meeting-panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+    animation: slideUp 0.35s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .meeting-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .meeting-header h2 {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: pulse 1s infinite;
+  }
+
+  .meeting-topic {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .meeting-topic input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 15px;
+    font-family: inherit;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+
+  .meeting-topic input::placeholder { color: var(--text-muted); }
+  .meeting-topic input:focus {
+    border-color: var(--border);
+    background: var(--surface);
+  }
+
+  .meeting-discussion {
+    padding: 18px 22px;
+    min-height: 180px;
+  }
+
+  .discussion-message {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .discussion-message .avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .message-bubble {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0 12px 12px 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .message-bubble .sender {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .message-bubble .sender.code    { color: #67b3ed; }
+  .message-bubble .sender.arch    { color: #c084fc; }
+  .message-bubble .sender.test    { color: #3dd68c; }
+  .message-bubble .sender.security { color: #f5604a; }
+  .message-bubble .sender.product  { color: #f5c842; }
+  .message-bubble .sender.devops   { color: #f5a742; }
+  .message-bubble .sender.data     { color: #63d2ff; }
+  .message-bubble .sender.ux       { color: #f871b4; }
+
+  .message-bubble p { color: var(--text-muted); }
+  .message-bubble .topic-line { color: var(--text); font-style: italic; }
+
+  /* ── Add Expert Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .modal {
+    background: #16161e;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    width: 420px;
+    max-width: 95vw;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header h3 { font-size: 15px; }
+
+  .modal-body { padding: 22px; }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .form-group textarea { resize: vertical; min-height: 72px; }
+
+  .form-group select { cursor: pointer; }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Toast ── */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    padding: 12px 18px;
+    background: #1e1e2a;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    animation: toastIn 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.info    { border-left: 3px solid var(--accent); }
+  .toast.warning { border-left: 3px solid var(--yellow); }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--text-muted);
+  }
+
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+  .empty-state h3 { font-size: 16px; margin-bottom: 6px; color: var(--text); }
+  .empty-state p { font-size: 13px; }
+
+  /* ── Misc ── */
+  .hidden { display: none !important; }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 28px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🧠</div>
+      <h1>Hermes</h1>
+    </div>
+    <p>AI 专家团多角色协作系统 — 智能聚合，协同决策</p>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="tag" id="expertCount">0 位专家</span>
+      <span class="tag" id="meetingStatus" class="hidden">🔥 会议进行中</span>
+    </div>
+    <div class="toolbar-right">
+      <button class="btn" onclick="openAddModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        添加专家
+      </button>
+      <button class="btn btn-primary" id="summonBtn" onclick="toggleMeeting()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5,3 19,12 5,21"/></svg>
+        <span id="summonText">召集开会</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Expert Grid -->
+  <div class="experts-grid" id="expertsGrid">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">👥</div>
+      <h3>还没有专家加入</h3>
+      <p>点击「添加专家」创建你的团队</p>
+    </div>
+  </div>
+
+  <!-- Meeting Panel -->
+  <div class="meeting-panel hidden" id="meetingPanel">
+    <div class="meeting-header">
+      <h2><span class="live-dot"></span> 专家研讨会</h2>
+      <button class="btn btn-danger" onclick="toggleMeeting()">结束会议</button>
+    </div>
+    <div class="meeting-topic">
+      <input type="text" id="meetingTopicInput" placeholder="输入讨论主题，按回车开始…">
+    </div>
+    <div class="meeting-discussion" id="discussionArea">
+      <div class="discussion-message">
+        <div class="avatar" style="background:linear-gradient(135deg,#6c63ff,#a855f7)">🤖</div>
+        <div class="message-bubble">
+          <div class="sender" style="color:var(--accent)">Hermes 系统</div>
+          <p>各位专家已就位，请输入讨论主题开始协作。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add Expert Modal -->
+<div class="modal-overlay hidden" id="addModal" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3>添加专家</h3>
+      <button class="btn" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>姓名</label>
+        <input type="text" id="expertName" placeholder="例如：张三">
+      </div>
+      <div class="form-group">
+        <label>角色类型</label>
+        <select id="expertRole">
+          <option value="code">代码审查专家</option>
+          <option value="arch">架构师</option>
+          <option value="test">测试工程师</option>
+          <option value="security">安全专家</option>
+          <option value="product">产品经理</option>
+          <option value="devops">DevOps 工程师</option>
+          <option value="data">数据工程师</option>
+          <option value="ux">UX 设计专家</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>角色描述</label>
+        <textarea id="expertDesc" placeholder="简要描述该专家的专长和背景…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAddModal()">取消</button>
+      <button class="btn btn-primary" onclick="addExpert()">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  /* ── State ── */
+  const state = {
+    experts: [],
+    inMeeting: false,
+    meetingTopic: '',
+  };
+
+  /* ── Expert Data ── */
+  const expertTemplates = {
+    code:     { name: '李明', role: 'code',     desc: '资深代码审查专家，精通重构、性能优化与设计模式。', emoji: '🔍', color: '#67b3ed' },
+    arch:     { name: '王锋', role: 'arch',     desc: '系统架构师，擅长分布式系统设计与微服务治理。',      emoji: '🏗️',  color: '#c084fc' },
+    test:     { name: '赵婷', role: 'test',     desc: '测试工程专家，专注自动化测试与质量保障体系。',       emoji: '🧪',  color: '#3dd68c' },
+    security: { name: '周凯', role: 'security', desc: '安全工程师，熟悉渗透测试与漏洞防护机制。',            emoji: '🔒',  color: '#f5604a' },
+    product:  { name: '陈琳', role: 'product',  desc: '产品经理，专注于用户体验与产品增长策略。',           emoji: '📦',  color: '#f5c842' },
+    devops:   { name: '刘洋', role: 'devops',   desc: 'DevOps 工程师，熟练掌握 CI/CD 与云原生架构。',       emoji: '⚙️',  color: '#f5a742' },
+    data:     { name: '孙悦', role: 'data',     desc: '数据工程师，精通大数据处理与机器学习工程化。',       emoji: '📊',  color: '#63d2ff' },
+    ux:       { name: '吴婷', role: 'ux',       desc: 'UX 设计专家，关注交互体验与界面可访问性。',          emoji: '🎨',  color: '#f871b4' },
+  };
+
+  /* ── Discussion Scripts ── */
+  const discussionScripts = {
+    code: [
+      (t) => `我分析了这个问题，核心在于「${t}」。建议先从模块边界入手，梳理出关键依赖链。`,
+      (t) => `同意。不过在重构之前，我建议先做一次代码覆盖率分析，确保改动的风险可控。`,
+      (t) => `我补充一点：这个场景下可以引入策略模式来解耦具体实现，降低后续维护成本。`,
+    ],
+    arch: [
+      (t) => `从架构视角看，「${t}」涉及多个子系统之间的协作。建议采用事件驱动架构来降低耦合。`,
+      (t) => `考虑到扩展性，我建议引入 API Gateway 统一入口，配合服务网格做流量治理。`,
+      (t) => `补充：数据一致性是这类系统的难点，建议明确是最终一致还是强一致，再选型。`,
+    ],
+    test: [
+      (t) => `针对「${t}」，我建议从用户关键路径出发，先覆盖核心业务流程的端到端测试。`,
+      (t) => `在测试策略上，推荐分层测试：单元测试保证基础逻辑，集成测试验证组件协作，E2E 测试覆盖关键路径。`,
+      (t) => `可以引入契约测试（Contract Testing）来解耦微服务间的依赖，避免集成地狱。`,
+    ],
+    security: [
+      (t) => `安全角度审视「${t}」，首先需要确认是否存在未授权访问与数据泄露风险。`,
+      (t) => `建议进行威胁建模，识别攻击面。重点关注输入校验、身份认证与权限控制三个层面。`,
+      (t) => `补充：敏感数据传输必须加密，密钥管理建议使用 KMS 服务，不要硬编码在代码中。`,
+    ],
+    product: [
+      (t) => `从产品角度思考「${t}」，核心是搞清楚目标用户是谁、他们真正的问题是什么。`,
+      (t) => `建议先做用户调研或数据分析，找到痛点优先级，再决定技术实现方案。`,
+      (t) => `功能迭代节奏也很重要，建议小步快跑、快速验证假设，避免过度设计。`,
+    ],
+    devops: [
+      (t) => `关于「${t}」，我建议先评估现有的 CI/CD 流水线，找出瓶颈环节。`,
+      (t) => `可以从容器化改造开始，统一构建环境，再逐步实现灰度发布与回滚机制。`,
+      (t) => `监控告警体系同样关键，建议引入链路追踪（Tracing）提升问题定位效率。`,
+    ],
+    data: [
+      (t) => `针对「${t}」，从数据视角需要明确数据源头、质量标准与分析目标。`,
+      (t) => `建议构建数据血缘图谱，方便追踪数据流转与变更影响范围。`,
+      (t) => `如果涉及实时分析，可以考虑 Flink 或 Spark Streaming 方案；离线批处理用 Spark 更成熟。`,
+    ],
+    ux: [
+      (t) => `体验层面看「${t}」，关键是简化用户操作路径，降低认知负荷。`,
+      (t) => `建议先做可用性测试或用户访谈，避免「设计者滤镜」影响判断。`,
+      (t) => `无障碍设计（a11y）不容忽视，考虑键盘导航、屏幕阅读器兼容与色彩对比度。`,
+    ],
+  };
+
+  /* ── Render ── */
+  function render() {
+    const grid = document.getElementById('expertsGrid');
+    const empty = document.getElementById('emptyState');
+    const countTag = document.getElementById('expertCount');
+    const meetingTag = document.getElementById('meetingStatus');
+
+    countTag.textContent = `${state.experts.length} 位专家`;
+
+    if (state.experts.length === 0) {
+      empty.classList.remove('hidden');
+      // remove all cards
+      grid.querySelectorAll('.expert-card').forEach(c => c.remove());
+      return;
+    }
+
+    empty.classList.add('hidden');
+
+    // remove stale cards
+    grid.querySelectorAll('.expert-card').forEach(c => c.remove());
+
+    state.experts.forEach((exp, i) => {
+      const card = document.createElement('div');
+      card.className = `expert-card${state.inMeeting && exp.active ? ' in-meeting' : ''}`;
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="avatar${state.inMeeting && exp.active ? ' working' : ''}"
+               style="background:linear-gradient(135deg,${exp.color},${exp.color}88)">
+            ${exp.emoji}
+          </div>
+          <div class="card-info">
+            <h3>${exp.name}</h3>
+            <span class="role-badge role-${exp.role}">${roleLabel(exp.role)}</span>
+          </div>
+        </div>
+        <p class="expert-desc">${exp.desc}</p>
+        <div class="card-footer">
+          <div class="status">
+            <span class="status-dot${state.inMeeting && exp.active ? ' busy' : ''}"></span>
+            <span>${state.inMeeting ? (exp.active ? '讨论中' : '旁听') : '空闲'}</span>
+          </div>
+          <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="removeExpert(${i})">移除</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function roleLabel(role) {
+    const map = {
+      code:'代码审查', arch:'架构师', test:'测试工程',
+      security:'安全', product:'产品', devops:'DevOps',
+      data:'数据', ux:'UX设计'
+    };
+    return map[role] || role;
+  }
+
+  /* ── Add Expert ── */
+  function openAddModal() {
+    document.getElementById('addModal').classList.remove('hidden');
+    document.getElementById('expertName').value = '';
+    document.getElementById('expertDesc').value = '';
+    document.getElementById('expertRole').value = 'code';
+    document.getElementById('expertName').focus();
+  }
+
+  function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+  }
+
+  function closeModal(e) {
+    if (e.target === e.currentTarget) closeAddModal();
+  }
+
+  function addExpert() {
+    const name = document.getElementById('expertName').value.trim();
+    const role = document.getElementById('expertRole').value;
+    const desc = document.getElementById('expertDesc').value.trim();
+
+    if (!name) { showToast('请输入专家姓名', 'warning'); return; }
+    if (!desc) { showToast('请输入角色描述', 'warning'); return; }
+
+    const template = expertTemplates[role];
+    state.experts.push({
+      name, role, desc,
+      emoji: template.emoji,
+      color: template.color,
+      active: true,
+    });
+
+    closeAddModal();
+    render();
+    showToast(`${name} 已加入专家团`, 'success');
+  }
+
+  function removeExpert(index) {
+    const exp = state.experts[index];
+    state.experts.splice(index, 1);
+    render();
+    showToast(`${exp.name} 已移除`, 'info');
+  }
+
+  /* ── Meeting ── */
+  function toggleMeeting() {
+    state.inMeeting = !state.inMeeting;
+
+    const panel = document.getElementById('meetingPanel');
+    const btn = document.getElementById('summonBtn');
+    const text = document.getElementById('summonText');
+    const tag = document.getElementById('meetingStatus');
+    const topicInput = document.getElementById('meetingTopicInput');
+
+    if (state.inMeeting) {
+      panel.classList.remove('hidden');
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>结束会议`;
+      btn.classList.remove('btn-primary');
+      tag.classList.remove('hidden');
+      topicInput.focus();
+
+      // reset experts active
+      state.experts.forEach(e => e.active = true);
+
+      // initial greeting
+      addBotMessage('各位专家已就位，请输入讨论主题开始协作。');
+    } else {
+      panel.classList.add('hidden');
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5,3 19,12 5,21"/></svg>召集开会`;
+      btn.classList.add('btn-primary');
+      tag.classList.add('hidden');
+
+      // clear discussion
+      document.getElementById('discussionArea').innerHTML = `
+        <div class="discussion-message">
+          <div class="avatar" style="background:linear-gradient(135deg,#6c63ff,#a855f7)">🤖</div>
+          <div class="message-bubble">
+            <div class="sender" style="color:var(--accent)">Hermes 系统</div>
+            <p>会议已结束，等待下次召集。</p>
+          </div>
+        </div>
+      `;
+      topicInput.value = '';
+      state.meetingTopic = '';
+    }
+
+    render();
+  }
+
+  /* ── Meeting Topic & Discussion ── */
+  document.getElementById('meetingTopicInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && this.value.trim()) {
+      state.meetingTopic = this.value.trim();
+      startDiscussion();
+    }
+  });
+
+  function startDiscussion() {
+    const area = document.getElementById('discussionArea');
+    area.innerHTML = '';
+
+    addBotMessage(`讨论主题已确定：<span class="topic-line">「${state.meetingTopic}」</span>，各专家开始分析…`, 0);
+
+    // sequential expert messages
+    const activeExperts = state.experts.filter(e => e.active);
+    let delay = 800;
+
+    activeExperts.forEach((exp, idx) => {
+      setTimeout(() => {
+        const msgs = discussionScripts[exp.role];
+        if (msgs && msgs[idx % msgs.length]) {
+          const topicPart = idx === 0 ? state.meetingTopic : state.meetingTopic;
+          addExpertMessage(exp, msgs[idx % msgs.length](topicPart));
+        }
+        if (idx === activeExperts.length - 1) {
+          setTimeout(() => addBotMessage('以上是各位专家的初步分析。如需深入讨论，请继续提问。'), 1200);
+        }
+      }, delay);
+      delay += 1800 + Math.random() * 600;
+    });
+  }
+
+  function addExpertMessage(exp, text) {
+    const area = document.getElementById('discussionArea');
+    const div = document.createElement('div');
+    div.className = 'discussion-message';
+    div.innerHTML = `
+      <div class="avatar" style="background:linear-gradient(135deg,${exp.color},${exp.color}88)">${exp.emoji}</div>
+      <div class="message-bubble">
+        <div class="sender ${exp.role}">${exp.name}</div>
+        <p>${text}</p>
+      </div>
+    `;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function addBotMessage(text, delay = 0) {
+    const area = document.getElementById('discussionArea');
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'discussion-message';
+      div.innerHTML = `
+        <div class="avatar" style="background:linear-gradient(135deg,#6c63ff,#a855f7)">🤖</div>
+        <div class="message-bubble">
+          <div class="sender" style="color:var(--accent)">Hermes 系统</div>
+          <p>${text}</p>
+        </div>
+      `;
+      area.appendChild(div);
+      area.scrollTop = area.scrollHeight;
+    }, delay);
+  }
+
+  /* ── Toast ── */
+  function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'warning' ? '⚠' : 'ℹ'}</span> ${msg}`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  /* ── Init ── */
+  render();
+</script>
+
+</body>
+</html>
