@@ -1,0 +1,5 @@
+# ChatCut 插件内置的 ffmpeg 二进制压缩包（114MB）不入库
+# 本机已有系统级 ffmpeg；需要时从 ChatCut-Inc/agent-plugin 仓库获取
+skills/video-creation/chatcut-asset-import/scripts/ffmpeg/
+*.exe.gz
+*.gz
