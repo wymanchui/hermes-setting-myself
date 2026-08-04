@@ -1,0 +1,49 @@
+model:
+  default: deepseek-v4-flash
+  provider: deepseek
+  base_url: https://api.deepseek.com/v1
+agent:
+  verify_on_stop: false
+  max_iterations: 50
+  tool_progress: all
+  reasoning_effort: medium
+  fallback_vision_model: glm-4v-flash
+compression:
+  enabled: true
+  threshold: 0.7
+  target_ratio: 0.2
+  protect_recent: 15
+display:
+  language: zh
+  tool_progress: all
+memory:
+  enabled: true
+_config_version: 32
+session:
+  persist: true
+  auto_compress_threshold: 0.85
+tui:
+  theme: dark
+  animations: true
+plugins:
+  enabled: []
+platform_toolsets:
+  cli:
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - kanban
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+known_plugin_toolsets:
+  cli:
+    - spotify
