@@ -1,13 +1,27 @@
-model:
-  default: deepseek-v4-flash
-  provider: deepseek
-  base_url: https://api.deepseek.com/v1
+models:
+  - model_id: deepseek-v4-flash
+    provider: openai
+    base_url: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+    capabilities:
+      vision: false
+      completion: true
+      streaming: true
+  - model_id: MiniMax-M3
+    provider: openai
+    base_url: https://api.minimaxi.com/v1
+    api_key: ${MINIMAX_API_KEY}
+    capabilities:
+      vision: true
+      completion: true
+      streaming: true
+    max_tokens: 4096
 agent:
   verify_on_stop: false
   max_iterations: 50
   tool_progress: all
   reasoning_effort: medium
-  fallback_vision_model: glm-4v-flash
+  fallback_vision_model: MiniMax-M3
 compression:
   enabled: true
   threshold: 0.7
