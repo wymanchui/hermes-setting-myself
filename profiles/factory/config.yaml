@@ -1,0 +1,97 @@
+models:
+  - model_id: deepseek-v4-flash
+    provider: openai
+    base_url: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+    capabilities:
+      vision: false
+      completion: true
+      streaming: true
+  - model_id: glm-4v-flash
+    provider: openai
+    base_url: https://open.bigmodel.cn/api/paas/v4/
+    api_key: ${GLM_API_KEY}
+    capabilities:
+      vision: true
+      completion: true
+      streaming: true
+    max_tokens: 1024
+  - model_id: Qwen/Qwen2-VL-7B-Instruct
+    provider: openai
+    base_url: https://api.siliconflow.cn/v1
+    api_key: ${SILICONFLOW_API_KEY}
+    capabilities:
+      vision: true
+      completion: true
+      streaming: true
+    max_tokens: 1024
+  - model_id: MiniMax-M3
+    provider: openai
+    base_url: https://api.minimaxi.com/v1
+    api_key: ${MINIMAX_API_KEY}
+    capabilities:
+      vision: true
+      completion: true
+      streaming: true
+    max_tokens: 4096
+agent:
+  max_iterations: 50
+  tool_progress: all
+  reasoning_effort: medium
+  verify_on_stop: false
+  fallback_vision_model: glm-4v-flash
+compression:
+  enabled: true
+  threshold: 0.6
+  target_ratio: 0.2
+  protect_recent: 15
+curator:
+  enabled: true
+  consolidate: true
+  interval_hours: 24
+  stale_after_days: 30
+display:
+  language: zh
+  tool_progress: all
+memory:
+  enabled: true
+onboarding:
+  seen:
+    openclaw_residue_cleanup: true
+_config_version: 33
+session:
+  persist: true
+  auto_compress_threshold: 0.85
+tui:
+  theme: dark
+  animations: true
+plugins:
+  enabled: []
+platform_toolsets:
+  cli:
+    - clarify
+    - code_execution
+    - computer_use
+    - cronjob
+    - delegation
+    - file
+    - kanban
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - vision
+    - web
+known_plugin_toolsets:
+  cli:
+    - spotify
+mcp_servers:
+  cua-driver:
+    command: C:\Users\ADMIN\AppData\Local\Programs\Cua\cua-driver\bin\cua-driver.exe
+    args:
+      - mcp
+model:
+  provider: deepseek
+  default: deepseek-v4-flash
